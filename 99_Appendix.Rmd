@@ -1,0 +1,207 @@
+---
+title: "Neighborhood Disadvantage and Subjective Cognitive Decline Among Older Black Women Appendix"
+author: "Tanisha G. Hill-Jarrett, Peter T. Buto, Devon Delaney, Ketlyne Sol, Lisa L. Barnes, Zinzi Bailey, K. Ortiz, J.N. Hicks, L. Delp, Yvette Cozier, Patricia Coogan, Lynn Rosenberg, M. Maria Glymour"
+date: "`r Sys.Date()`"
+output:
+  bookdown::html_document2:
+    code_folding: hide
+    fig_caption: yes
+    table_caption: no
+    theme: cosmo
+    toc: no
+    toc_float:
+      collapsed: no
+    toc_depth: 3
+    number_sections: false
+editor_options:
+  chunk_output_type: console
+---
+
+```{r, include=FALSE}
+rm(list=ls())
+gc()
+knitr::opts_chunk$set(echo=FALSE)
+
+library(haven)
+library(MASS)
+library(nnet)
+library(tidyverse)
+library(broom)
+library(stargazer)
+library(ggplot2)
+library(ggpubr)
+library(kableExtra)
+library(fastDummies)
+
+data <- readRDS("cleaned/analytic_set.RDS")
+results<-readRDS("results/initial_results.RDS")
+
+table1 <- data %>% 
+  select(age15, heducparent, educ03, bmi15, diabev15, 
+         hypdever15, ahei2010_01, packycat15, vigact15, 
+         cesd05, Q5sumcat_15, publicch, publicad,
+         cogcat, ADI_st_quintile) 
+
+table1 <- dummy_cols(table1,
+                     select_columns = c("heducparent","educ03",
+                                        "packycat15","vigact15","Q5sumcat_15",
+                                        "cogcat","ADI_st_quintile"),
+                     remove_selected_columns = TRUE)
+
+plot_data_count <- data %>% group_by(ADI_st_quintile, cogcat) %>% tally()
+
+# Re-do the Multi-nom table to match the original publication
+multinom2_temp <- list()
+multinom2_clean<- list()
+for(m in unique(results$multi2$model)){
+  multinom2_temp[[m]] <- results$multi2 %>% filter(model == m) %>% 
+    select(-std.error, -statistic, -model)
+  multinom2_temp[[m]] <- multinom2_temp[[m]] %>% 
+    pivot_wider(names_from = ADI_quintile,
+                values_from = c(estimate, p.value, conf.low, conf.high))
+  multinom2_clean[[m]] <- multinom2_temp[[m]] %>% 
+    mutate('Second Quintile' = paste0(round(estimate_2, 2),
+                                      " (",round(conf.low_2,2),
+                                      ",",round(conf.high_2,2),") ",
+                                      "p=",round(p.value_2,2)),
+           'Third Quintile' = paste0(round(estimate_3, 2),
+                                     " (",round(conf.low_3,2),
+                                     ",",round(conf.high_3,2),") ",
+                                     "p=",round(p.value_3,2)),
+           'Fourth Quintile' = paste0(round(estimate_4, 2),
+                                      " (",round(conf.low_4,2),
+                                      ",",round(conf.high_4,2),") ",
+                                      "p=",round(p.value_4,2)),
+           'Fifth Quintile' = paste0(round(estimate_5, 2),
+                                     " (",round(conf.low_5,2),
+                                     ",",round(conf.high_5,2),") ",
+                                     "p=",round(p.value_5,2))) %>%
+    select(cog_cat_level, ends_with("Quintile"))
+}
+multinom2_clean <- bind_rows(multinom2_clean)
+multinom2_clean$model <- c("Unadj Model", "Unadj Model", "Model 1", "Model 1", 
+                           "Model 2", "Model 2", "Model 3", "Model 3")
+
+# Forgot to run this line before
+results$ordinal$term <- c("Unadj. Model", "Model 1", "Model 2", "Model 3")
+
+                      
+```
+
+```{r,results="asis", include=FALSE}
+stargazer(as.data.frame(table1 %>% 
+                          select(-ends_with("NA"))),
+          omit.summary.stat = c("Min", "Max"),
+          type="html",
+          title = "Participant Descriptives",
+          header=FALSE,
+          covariate.labels = c("Age","BMI","Diabetes Ever","Hypertension Ever",
+                               "AHEI","CESD", 
+                               "Public Assistance as a Child",
+                               "Public Assistance as an Adult",
+                               "Parent's Highest Education 1",
+                               "Parent's Highest Education 2",
+                               "Parent's Highest Education 3",
+                               "Parent's Highest Education 4",
+                               "Parent's Highest Education 5",
+                               "Own Education 1", "Own Education 2", 
+                               "Own Education 3", "Own Education 4", 
+                               "Own Education 5", 
+                               "Pack Years 0", "Pack Years 1",
+                               "Pack Years 2","Pack Years 3",
+                               "Pack Years 4",
+                               "Physical Activity 0","Physical Activity 1",
+                               "Physical Activity 2", #"Physical Activity NA", 
+                               "Insomnia 1","Insomnia 2", 
+                               "Insomnia 3", "Insomnia 4", 
+                               "Subjective Cognitive Function 0",
+                               "Subjective Cognitive Function 1",
+                               "Subjective Cognitive Function 2",
+                               "ADI State-level quintile 1",
+                               "ADI State-level quintile 2",
+                               "ADI State-level quintile 3",
+                               "ADI State-level quintile 4",
+                               "ADI State-level quintile 5")
+          )
+```
+
+# Modeling approaches
+
+We modeled Subjective Cognitive Impairment as a continuous variable, ordinal variable, and multinomial variable - each approach having advantages and disadvantages. The continuous form may be the easiest/most intuitive to interpret, however, it may not capture the true form of the outcome. The Ordinal approach takes advantage of the natural ordering of the cognitive outcome levels. The multinomial approach was previuosly used in another study but may not be sufficiently powered here. 
+
+## Supplementary Figure 1: Distribution of ADI
+```{r, message=FALSE}
+data %>% ggplot(aes(ADI_st_quintile)) +
+  theme_bw() +
+  geom_histogram() +
+  xlab("ADI Quintile at State Level")
+```
+
+## Supplementary Figure 2: Distribution of SCI 
+```{r, message=FALSE}
+data %>% ggplot(aes(cogsum)) + 
+  theme_bw() + 
+  geom_histogram() + 
+  xlab("Total sum of subjective cognitive Impairment")
+```
+
+## Supplementary Figure 3: Unadjusted association
+```{r, message=FALSE}
+plot_data_count %>% ggplot(aes(ADI_st_quintile, cogcat)) +
+  theme_bw() + 
+  geom_point(aes(size=n), shape=21) +
+  geom_smooth(data=data, 
+              aes(x=ADI_st_quintile,y=cogcat),
+              formula = y ~ x,
+              method="lm")
+```
+
+# Supplementary Summary of Results
+
+For each outcome model, we controlled for three different sets of covariates. 
+
+- The first set adjusted for Age, Region of Birth, Parental Education, Public Assistance. 
+- The second set further adjusted for own education.
+- Lastly, we controlled for BMI, T2DM, HTN, AHEI, Pack Years, Physical Activity, CESD, insomnia, and receipt of public assistance as an adult. 
+  - (This third set may include mediators and affect or measure of interest)
+
+
+## Linear Regression
+```{r}
+results$linear %>% 
+  kbl(digits = 3, caption = "Treat Outcome as Linear; Regression Outcomes") %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive")) %>%
+  row_spec(which(results$linear$p.value < 0.05), bold = T, color = "white", background = "green")
+```
+
+## Logistic Regression
+```{r}
+results$logistic %>% 
+  kbl(digits = 3, caption = "Treat Outcome as binary; Regression Outcomes") %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"))%>%
+  row_spec(which(results$logistic$p.value < 0.05), bold = T, color = "white", background = "green")
+```
+
+## Ordinal Regression
+```{r}
+results$ordinal %>% 
+  kbl(digits = 3, caption = "Treat Outcome as Ordinal; Regression Outcomes") %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"))%>%
+  row_spec(which(results$ordinal$term %in% c("Unadj. Model","Model 1")), bold = T, color = "white", background = "green")
+```
+
+## Multinomial Regression
+```{r}
+results$polynom %>% 
+  kbl(digits = 3, caption = "Treat Outcome as multinomial; Regression Outcomes") %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"))%>%
+  row_spec(which(results$polynom$p.value < 0.05), bold = T, color = "white", background = "green")
+```
+
+## Multinomial Regression Factor
+```{r, echo =FALSE}
+multinom2_clean %>% 
+  kbl(digits = 3, caption = "Treat Outcome as multinomial; exposure as factor") %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive")) %>%
+  row_spec(c(2,4), bold = T, color = "white", background = "green")
+```

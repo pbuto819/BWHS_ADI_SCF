@@ -1,0 +1,6 @@
+Notes
+
+The difference between 01_Analysis and 01a_Analysis is the placement of public assistance IN CHILDHOOD variable.
+01a removes it from model 4 and adds it to model 1 as it occurs long before the exposure/outcome relationship. 
+
+Moving forward, will continue with 01a as default 
